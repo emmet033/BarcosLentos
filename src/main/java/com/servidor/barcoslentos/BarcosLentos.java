@@ -2,20 +2,21 @@ package com.servidor.barcoslentos;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Boat;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-public class BarcosLentos extends JavaPlugin implements CommandExecutor {
+public class BarcosLentos extends JavaPlugin implements Listener, CommandExecutor {
 
     private double multiplicadorAgua;
     private double multiplicadorHielo;
@@ -25,57 +26,10 @@ public class BarcosLentos extends JavaPlugin implements CommandExecutor {
         saveDefaultConfig();
         cargarConfiguracion();
 
+        Bukkit.getPluginManager().registerEvents(this, this);
         if (getCommand("barcosreload") != null) {
             getCommand("barcosreload").setExecutor(this);
         }
-
-        // Tarea que revisa los barcos activos cada 1 tick (20 veces por segundo)
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (World mundo : Bukkit.getWorlds()) {
-                    for (Boat barco : mundo.getEntitiesByClass(Boat.class)) {
-                        if (barco.getPassengers().isEmpty()) {
-                            continue;
-                        }
-
-                        Entity conductor = barco.getPassengers().get(0);
-                        if (!(conductor instanceof Player)) {
-                            continue;
-                        }
-
-                        Vector velActual = barco.getVelocity();
-                        double velocidadHorizontal = Math.hypot(velActual.getX(), velActual.getZ());
-
-                        // Si el barco está prácticamente quieto, no intervenir
-                        if (velocidadHorizontal < 0.01) {
-                            continue;
-                        }
-
-                        Block bloqueDebajo = barco.getLocation().subtract(0, 0.2, 0).getBlock();
-                        Material tipo = bloqueDebajo.getType();
-
-                        double mult = multiplicadorAgua;
-                        if (tipo == Material.ICE || tipo == Material.PACKED_ICE || tipo == Material.BLUE_ICE || tipo == Material.FROSTED_ICE) {
-                            mult = multiplicadorHielo;
-                        }
-
-                        // Velocidad base estándar de un bote en Minecraft (~0.4 bloques/tick)
-                        double velocidadObjetivo = 0.4 * mult;
-
-                        // Solo limitar si supera la velocidad objetivo configurada
-                        if (velocidadHorizontal > velocidadObjetivo) {
-                            double factor = velocidadObjetivo / velocidadHorizontal;
-                            barco.setVelocity(new Vector(
-                                    velActual.getX() * factor,
-                                    velActual.getY(),
-                                    velActual.getZ() * factor
-                            ));
-                        }
-                    }
-                }
-            }
-        }.runTaskTimer(this, 1L, 1L);
 
         getLogger().info("BarcosLentos activado correctamente.");
     }
@@ -94,5 +48,48 @@ public class BarcosLentos extends JavaPlugin implements CommandExecutor {
             return true;
         }
         return false;
+    }
+
+    @EventHandler
+    public void alMoverBarco(VehicleMoveEvent event) {
+        if (!(event.getVehicle() instanceof Boat)) {
+            return;
+        }
+
+        Boat barco = (Boat) event.getVehicle();
+
+        // Solo aplicar si hay un jugador conduciendo
+        if (barco.getPassengers().isEmpty() || !(barco.getPassengers().get(0) instanceof Player)) {
+            return;
+        }
+
+        Location desde = event.getFrom();
+        Location hacia = event.getTo();
+
+        // Calcular el desplazamiento real que intentó hacer el jugador en este tick
+        double deltaX = hacia.getX() - desde.getX();
+        double deltaZ = hacia.getZ() - desde.getZ();
+
+        // Si no hubo desplazamiento horizontal, salir
+        if (Math.abs(deltaX) < 0.0001 && Math.abs(deltaZ) < 0.0001) {
+            return;
+        }
+
+        Block bloqueDebajo = barco.getLocation().subtract(0, 0.2, 0).getBlock();
+        Material tipo = bloqueDebajo.getType();
+
+        double mult = this.multiplicadorAgua;
+        if (tipo == Material.ICE || tipo == Material.PACKED_ICE || tipo == Material.BLUE_ICE || tipo == Material.FROSTED_ICE) {
+            mult = this.multiplicadorHielo;
+        }
+
+        // Aplicar el multiplicador directamente al desplazamiento real y enviarlo al cliente
+        Vector nuevaVelocidad = new Vector(
+                deltaX * mult,
+                barco.getVelocity().getY(),
+                deltaZ * mult
+        );
+
+        barco.setVelocity(nuevaVelocidad);
     }
 }
