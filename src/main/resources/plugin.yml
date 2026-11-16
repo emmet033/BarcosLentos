@@ -1,0 +1,13 @@
+name: BarcosLentos
+version: 1.0
+main: com.servidor.barcoslentos.BarcosLentos
+api-version: 1.18
+commands:
+  barcosreload:
+    description: Recarga la configuracion de velocidad de los barcos.
+    usage: /barcosreload
+    permission: barcoslentos.admin
+permissions:
+  barcoslentos.admin:
+    description: Permite recargar la configuracion del plugin.
+    default: op
