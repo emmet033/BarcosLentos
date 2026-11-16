@@ -1,0 +1,7 @@
+# Configuración de BarcosLentos
+
+# Multiplicador de velocidad en el agua (1.0 = velocidad normal, 0.5 = mitad de velocidad, 0.25 = un cuarto)
+multiplicador-agua: 0.5
+
+# Multiplicador de velocidad sobre hielo o tierra (evita las autopistas de hielo ultra rápidas)
+multiplicador-hielo: 0.2
